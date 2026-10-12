@@ -524,6 +524,10 @@ body:has(#app-wrapper.hidden) #neon-mobile-dock{display:none!important}#neon-mob
                             <div class="dash-hero-title biz-name-display">Jersey Nova</div>
                             <div>
                                 <span class="dash-hero-pill"><i class="fas fa-clock"></i> <span id="hero-time"></span></span>
+                                <!-- লাইভ শপ ভিজিটর ব্যাজ -->
+<span id="live-visitor-pill" class="dash-hero-pill" style="background:rgba(16,185,129,.9);border-color:rgba(255,255,255,.3);cursor:pointer;" onclick="requestVisitorNotification()">
+    <i class="fas fa-circle text-emerald-300 animate-pulse"></i> লাইভ শপ ভিজিটর: <b id="live-visitor-count">০</b> জন
+</span>
                                 <span id="delayed-courier-badge" class="dash-hero-pill hidden" style="background:rgba(239,68,68,.85);border-color:rgba(255,255,255,.3)"><i class="fas fa-truck"></i> <span></span></span>
                             </div>
                         </div>

@@ -2771,6 +2771,51 @@ body:has(#app-wrapper.hidden) #neon-mobile-dock{display:none!important}#neon-mob
                 </div>`;
             });
         }
+// ২৭৭৩ নম্বর লাইন:
+}
+
+// 👉 ঠিক এই ২৭৭৪ নম্বর ফাঁকা লাইনে নিচের কোডটি পেস্ট করুন:
+
+        // ===== লাইভ শপ ভিজিটর ট্র্যাকিং ও পুশ নোটিফিকেশন =====
+        function requestVisitorNotification(){
+            if ("Notification" in window) {
+                Notification.requestPermission().then(function(perm){
+                    if(perm === 'granted'){
+                        Swal.fire({icon:'success', title:'নোটিফিকেশন চালু হয়েছে!', text:'নতুন কেউ শপে ঢুকলে নোটিফিকেশন পাবেন।'});
+                    }
+                });
+            }
+        }
+
+        function triggerVisitorAlert(device){
+            if ("Notification" in window && Notification.permission === "granted") {
+                new Notification("👕 Jersey Nova: নতুন কাস্টমার!", {
+                    body: "একজন কাস্টমার (" + device + ") এইমাত্র আপনার শপে ঢুকেছেন।",
+                    icon: "favicon.png"
+                });
+            }
+        }
+
+        let prevVisitorCount = 0;
+        let isFirstLoad = true;
+        firebase.database().ref('shop_visitors').on('value', function(snap){
+            const data = snap.val() || {};
+            const list = Object.values(data);
+            const count = list.length;
+            
+            const badge = document.getElementById('live-visitor-count');
+            if(badge) badge.innerText = count;
+
+            if(!isFirstLoad && count > prevVisitorCount) {
+                const latest = list[list.length - 1];
+                triggerVisitorAlert((latest && latest.device) ? latest.device : 'Mobile');
+            }
+            prevVisitorCount = count;
+            isFirstLoad = false;
+        });
+
+// ২৭৭৫ নম্বর লাইন:
+function applyAdminUI(){
 
         function applyAdminUI(){
             // Show admin-only panel

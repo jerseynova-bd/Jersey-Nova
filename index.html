@@ -515,6 +515,11 @@ body:has(#app-wrapper.hidden) #neon-mobile-dock{display:none!important}#neon-mob
                 <div class="flex flex-col mb-4 no-print px-2">
                     <h2 class="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-800 to-purple-600">ড্যাশবোর্ড ওভারভিউ</h2>
                     <p id="dashboard-date-range" class="text-sm font-bold text-purple-500/80">সব ডাটা দেখানো হচ্ছে</p>
+                            <div class="mt-2 flex items-center gap-2">
+            <button type="button" id="live-visitor-pill" onclick="requestVisitorNotification()" style="display:inline-flex;align-items:center;gap:8px;background:#059669;color:#ffffff;padding:6px 14px;border-radius:20px;font-size:13px;font-weight:700;border:1px solid rgba(255,255,255,0.2);cursor:pointer;box-shadow:0 2px 8px rgba(5,150,105,0.4);">
+                <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#34d399;"></span>
+                লাইভ শপ ভিজিটর: <b id="live-visitor-count" style="font-size:15px;margin-left:2px;margin-right:2px;">০</b> জন
+            </button>
                 </div>
 
                 <div class="dash-hero mb-5 no-print">
@@ -524,10 +529,7 @@ body:has(#app-wrapper.hidden) #neon-mobile-dock{display:none!important}#neon-mob
                             <div class="dash-hero-title biz-name-display">Jersey Nova</div>
                             <div>
                                 <span class="dash-hero-pill"><i class="fas fa-clock"></i> <span id="hero-time"></span></span>
-                                <!-- লাইভ শপ ভিজিটর ব্যাজ -->
-<span id="live-visitor-pill" class="dash-hero-pill" style="background:rgba(16,185,129,.9);border-color:rgba(255,255,255,.3);cursor:pointer;" onclick="requestVisitorNotification()">
-    <i class="fas fa-circle text-emerald-300 animate-pulse"></i> লাইভ শপ ভিজিটর: <b id="live-visitor-count">০</b> জন
-</span>
+                               
                                 <span id="delayed-courier-badge" class="dash-hero-pill hidden" style="background:rgba(239,68,68,.85);border-color:rgba(255,255,255,.3)"><i class="fas fa-truck"></i> <span></span></span>
                             </div>
                         </div>

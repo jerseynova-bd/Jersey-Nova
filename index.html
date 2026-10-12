@@ -4974,6 +4974,21 @@ function applyAdminUI(){
   var loaded=false;
   function loadShop(){
     if(loaded) return; loaded=true;
+        // Live Visitor Tracker
+  try {
+    var vId = localStorage.getItem('jn_v_id');
+    if (!vId) {
+      vId = 'v_' + Math.random().toString(36).substring(2, 9) + '_' + Date.now();
+      localStorage.setItem('jn_v_id', vId);
+    }
+    var vRef = rdb().ref('shop_visitors/' + vId);
+    vRef.set({
+      id: vId,
+      device: /Mobile|Android|iPhone/i.test(navigator.userAgent) ? 'Mobile' : 'Desktop',
+      time: Date.now()
+    });
+    vRef.onDisconnect().remove();
+  } catch(e) {}
     rdb().ref('shop_public/settings').on('value', function(s){ CFG = s.val()||{}; setLinks(); });
     rdb().ref('shop_public/products').on('value', function(s){ P = s.val()||{}; renderGrid(); },
       function(){ document.getElementById('sh-grid').innerHTML='<div class="sh-empty">শপ এখনো চালু হয়নি।</div>'; });

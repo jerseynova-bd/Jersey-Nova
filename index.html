@@ -4983,15 +4983,31 @@ body:has(#jn-shop:not([hidden])){display:block}
   window.addEventListener('hashchange', route);
 
   var visitorRef=null, visitorConnected=null;
+  // Instant phone alert via the free ntfy app (subscribe to this topic on the admin phone).
+  var NTFY_TOPIC='jerseynova-visit-529e0a476dcf';
+  function phoneAlert(device){
+    try{
+      if(sessionStorage.getItem('jn_alerted')) return; // one alert per visit, not per reconnect
+      sessionStorage.setItem('jn_alerted','1');
+      var ref=document.referrer?(' • এসেছে: '+document.referrer.replace(/^https?:\/\//,'').split('/')[0]):'';
+      fetch('https://ntfy.sh/',{method:'POST',keepalive:true,body:JSON.stringify({
+        topic:NTFY_TOPIC,title:'👕 Jersey Nova: নতুন ভিজিটর!',
+        message:'একজন কাস্টমার ('+device+') এইমাত্র শপে ঢুকেছেন'+ref,
+        tags:['shirt'],priority:4,click:location.origin+location.pathname+'#admin'
+      })}).catch(function(){});
+    }catch(e){}
+  }
   function startVisitor(){
     if(visitorConnected) return;
+    var device=/Mobile|Android|iPhone/i.test(navigator.userAgent)?'Mobile':'Desktop';
+    if(!/bot|crawl|spider|lighthouse|headless/i.test(navigator.userAgent)) phoneAlert(device);
     // A connection per tab; server disconnect cleanup survives tab closure.
     visitorConnected=rdb().ref('.info/connected');
     visitorConnected.on('value',function(s){
       if(!s.val() || location.hash==='#admin') return;
       visitorRef=rdb().ref('shop_visitors').push();
       visitorRef.onDisconnect().remove().then(function(){
-        return visitorRef.set({device:/Mobile|Android|iPhone/i.test(navigator.userAgent)?'Mobile':'Desktop',time:firebase.database.ServerValue.TIMESTAMP});
+        return visitorRef.set({device:device,time:firebase.database.ServerValue.TIMESTAMP});
       }).catch(function(e){console.warn('Visitor tracking unavailable:',e.code || 'connection');});
     });
   }

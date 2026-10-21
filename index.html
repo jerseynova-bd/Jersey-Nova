@@ -3502,11 +3502,19 @@ body:has(#jn-shop:not([hidden])){display:block}
         }
 
         function courierBadgeHTML(o){
-            if(!o || (!o.pathaoConsignmentId && !o.courierStatusText)) return '';
-            const track = o.pathaoTrackingUrl || (o.pathaoConsignmentId ? ('https://merchant.pathao.com/tracking?consignment_id='+o.pathaoConsignmentId+'&phone='+(o.phone||'')) : '');
-            const txt = o.courierStatusText || 'বুকড';
+            if(!o || (!o.pathaoConsignmentId && !o.steadfastCid && !o.courierStatusText)) return '';
+            const track = o.pathaoTrackingUrl || (o.pathaoConsignmentId ? ('https://merchant.pathao.com/tracking?consignment_id='+o.pathaoConsignmentId+'&phone='+(o.phone||'')) : (o.steadfastTracking ? ('https://steadfast.com.bd/t/'+o.steadfastTracking) : ''));
+            let txt = o.courierStatusText || 'বুকড';
+            // অর্ডারের চূড়ান্ত স্ট্যাটাস পুরনো "বুক হয়েছে" লেখাকে ছাপিয়ে যাবে
+            const stale = !/ডেলিভারি হয়েছে|টাকা পেয়েছি|রিটার্ন|বাতিল/.test(txt);
+            const FIN = {Paid:'ডেলিভারি ও টাকা পেয়েছি ✅',Delivered:'ডেলিভারি হয়েছে ✅ (টাকা বাকি)',Returned:'পার্সেল রিটার্ন ⚠️',Cancelled:'বাতিল ❌'};
+            if(FIN[o.status] && (stale || o.status==='Paid')) txt = FIN[o.status];
+            const done = o.status==='Paid'||o.status==='Delivered';
+            const cls = done ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : (o.status==='Returned'||o.status==='Cancelled') ? 'bg-red-50 text-red-700 border-red-200' : 'bg-pink-50 text-pink-700 border-pink-200';
+            const canRef = (o.pathaoConsignmentId || o.steadfastCid) && o.status!=='Paid';
             return `<div class="mt-1 text-[10px] font-black">
-                <span class="bg-pink-50 text-pink-700 border border-pink-200 px-2 py-0.5 rounded">🚚 ${txt}</span>
+                <span class="${cls} border px-2 py-0.5 rounded">🚚 ${txt}</span>
+                ${canRef?`<button type="button" title="কুরিয়ার থেকে এখনই আপডেট আনুন" onclick="event.stopPropagation();jnRefreshCourier('${o.id}',this)" class="ml-1 px-1.5 py-0.5 rounded border border-pink-200">🔄</button>`:''}
                 ${track?`<a href="${track}" target="_blank" class="text-indigo-600 underline ml-1">ট্র্যাক</a>`:''}
             </div>`;
         }
@@ -4731,7 +4739,18 @@ body:has(#jn-shop:not([hidden])){display:block}
     if(window.Toast)Toast.fire({icon:'success',title:'কুরিয়ার খরচ আপডেট হয়েছে'});
     setTimeout(function(){try{if(typeof openInvoice==='function')openInvoice(id);}catch(e){}},600);
   };
-  function start(){bind();setTimeout(check,8000);setInterval(check,5*60*1000);setInterval(bind,3000);}
+  window.jnRefreshCourier=async function(id,btn){
+    var o=(orders||[]).find(function(x){return String(x.id)===String(id)});if(!o)return;
+    if(btn){btn.disabled=true;btn.textContent='⏳';}
+    var ok=false,err='';
+    try{
+      if(o.pathaoConsignmentId){await syncOne(o);ok=true;}
+      else if(o.steadfastCid&&window.jnSfOne){await window.jnSfOne(o);ok=true;}
+    }catch(e){err=e&&e.message||'';console.warn(e);}
+    if(btn){btn.disabled=false;btn.textContent='🔄';}
+    if(window.Toast)Toast.fire({icon:ok?'success':'error',title:ok?'কুরিয়ার স্ট্যাটাস আপডেট হয়েছে':'কুরিয়ার থেকে আনা যায়নি — সেটিংসে কুরিয়ার লগইন দেখুন'});
+  };
+  function start(){bind();setTimeout(check,8000);setInterval(check,3*60*1000);setInterval(bind,3000);document.addEventListener('visibilitychange',function(){if(!document.hidden)setTimeout(check,1500);});}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
 })();
 </script>
@@ -4815,22 +4834,24 @@ body:has(#jn-shop:not([hidden])){display:block}
   };
   var SF_MAP={delivered:['ডেলিভারি হয়েছে ✅','Delivered'],partial_delivered:['আংশিক ডেলিভারি','Delivered'],cancelled:['বাতিল/রিটার্ন ❌','Returned'],delivered_approval_pending:['ডেলিভারি (অনুমোদন বাকি)',null],partial_delivered_approval_pending:['আংশিক ডেলিভারি (অনুমোদন বাকি)',null],cancelled_approval_pending:['বাতিল (অনুমোদন বাকি)',null],hold:['হোল্ডে আছে',null],in_review:['রিভিউতে আছে',null],pending:['পথে আছে 🚚',null],unknown:['অজানা',null]};
   var sfBusy=false;
+  async function sfOne(o,force){
+    var r=await fetch(SF+'/status_by_cid/'+encodeURIComponent(o.steadfastCid),{headers:sfHeaders()});var j=await r.json();
+    var st=String(j.delivery_status||'').toLowerCase(); if(!st) return;
+    var m=SF_MAP[st]||[st,null], slug='sf_'+st;
+    if(o.courierStatusSlug===slug&&!force) return;
+    var up={courierStatusText:m[0],courierStatusSlug:slug,courierStatusAt:Date.now()};
+    if(m[1]&&o.status!=='Paid'&&o.status!==m[1]) up.status=m[1];
+    await db.child(o.id).update(up);
+  }
+  window.jnSfOne=function(o){return sfOne(o,true);};
   async function sfSync(){
     var c=sfCfg(); if(sfBusy||!c.key||typeof db==='undefined') return; sfBusy=true;
     try{
       var list=((typeof orders!=='undefined'&&orders)||[]).filter(function(o){return o.steadfastCid&&['Paid','Returned','Cancelled'].indexOf(o.status)<0&&!(o.status==='Delivered'&&o.courierStatusSlug==='sf_delivered');});
-      for(var i=0;i<list.length;i++){var o=list[i];
-        try{var r=await fetch(SF+'/status_by_cid/'+encodeURIComponent(o.steadfastCid),{headers:sfHeaders()});var j=await r.json();
-          var st=String(j.delivery_status||'').toLowerCase(); if(!st) continue;
-          var m=SF_MAP[st]||[st,null], slug='sf_'+st;
-          if(o.courierStatusSlug===slug) continue;
-          var up={courierStatusText:m[0],courierStatusSlug:slug,courierStatusAt:Date.now()};
-          if(m[1]&&o.status!=='Paid') up.status=m[1];
-          await db.child(o.id).update(up);
-        }catch(e){}
-      }
+      for(var i=0;i<list.length;i++){try{await sfOne(list[i]);}catch(e){}}
     }finally{sfBusy=false;}
   }
+  document.addEventListener('visibilitychange',function(){if(!document.hidden)setTimeout(sfSync,1500);});
   function addRowButtons(){
     document.querySelectorAll('button[onclick^="openPathaoBooking("]').forEach(function(b){
       if(b.nextElementSibling&&b.nextElementSibling.dataset.sf) return;

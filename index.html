@@ -1521,6 +1521,7 @@ body:has(#jn-shop:not([hidden])){display:block}
             db.on('value', snap => { 
                 orders = snap.val() ? Object.values(snap.val()).map(o => ({...o, date: normalizeDate(o.date)})) : []; 
                 renderOrders(); renderCRM(); 
+                try{ jnPublishTrack(); }catch(e){}
                 refreshDelayedBadge(); alertDelayedOnce(); alertUrgentOnce();
                 _hideLoader();
                 if(document.getElementById('compare-box') && !document.getElementById('tab-reports').classList.contains('hidden')) renderMonthlyCompare();
@@ -3501,6 +3502,21 @@ body:has(#jn-shop:not([hidden])){display:block}
             }
         }
 
+        // 📦 কাস্টমার ট্র্যাকিং: ফোন নম্বরের হ্যাশ দিয়ে শুধু স্ট্যাটাস পাবলিক করা হয় (নাম/ঠিকানা নয়)
+        async function jnHashPhone(ph){ const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('jn:'+ph)); return Array.from(new Uint8Array(b)).map(x=>x.toString(16).padStart(2,'0')).join('').slice(0,32); }
+        let _jnTrT=null;
+        function jnPublishTrack(){ clearTimeout(_jnTrT); _jnTrT=setTimeout(async()=>{
+            const L={New:'অর্ডার পেয়েছি, কাজ শুরু হবে',Pending:'অর্ডার পেয়েছি, কাজ শুরু হবে',Processing:'জার্সি তৈরি হচ্ছে 🧵',Shipped:'কুরিয়ারে পাঠানো হয়েছে 🚚',Delivered:'ডেলিভারি হয়েছে ✅',Paid:'ডেলিভারি সম্পন্ন ✅',Returned:'পার্সেল রিটার্ন ⚠️',Cancelled:'বাতিল ❌'};
+            const cut=Date.now()-90*864e5, by={};
+            orders.forEach(o=>{ const ph=String(o.phone||'').replace(/\D/g,'').slice(-11); if(!/^01\d{9}$/.test(ph)) return; if((o.createdAt||o.id||0)<cut) return;
+                let s=L[o.status]||o.status||''; if(o.courierStatusText && !/Delivered|Paid|Returned|Cancelled/.test(o.status)) s=o.courierStatusText;
+                const t=o.pathaoTrackingUrl||(o.pathaoConsignmentId?('https://merchant.pathao.com/tracking?consignment_id='+o.pathaoConsignmentId+'&phone='+ph):(o.steadfastTracking?('https://steadfast.com.bd/t/'+o.steadfastTracking):''));
+                (by[ph]=by[ph]||[]).push({p:String(o.productName||'জার্সি').slice(0,40),s:String(s).slice(0,80),d:o.createdAt||o.id||0,t:t}); });
+            const out={}; for(const ph in by){ out[await jnHashPhone(ph)]=by[ph].sort((a,b)=>b.d-a.d).slice(0,5); }
+            const js=JSON.stringify(out); if(localStorage.getItem('jn_track_last')===js) return;
+            firebase.database().ref('shop_public/track').set(out).then(()=>localStorage.setItem('jn_track_last',js)).catch(e=>console.warn('track publish',e));
+        },2000); }
+
         function courierBadgeHTML(o){
             if(!o || (!o.pathaoConsignmentId && !o.steadfastCid && !o.courierStatusText)) return '';
             const track = o.pathaoTrackingUrl || (o.pathaoConsignmentId ? ('https://merchant.pathao.com/tracking?consignment_id='+o.pathaoConsignmentId+'&phone='+(o.phone||'')) : (o.steadfastTracking ? ('https://steadfast.com.bd/t/'+o.steadfastTracking) : ''));
@@ -4964,7 +4980,7 @@ body:has(#jn-shop:not([hidden])){display:block}
   <div class="nx-strip"><span>🛡️ অফিশিয়াল অনলাইন স্টোর</span><span>👥 টিম ও ক্লাব জার্সি স্পেশালিস্ট (মিনিমাম ৫ পিস)</span><span>🚚 সমগ্র বাংলাদেশে নিরাপদ হোম ডেলিভারি</span></div>
   <div class="sh-top nx-top">
     <div class="nx-brand"><div class="nx-logo">JN</div><div><div class="sh-brand">JERSEY <b>NOVA</b> <i class="fas fa-circle-check nx-tick" title="Verified Official Store"></i></div><div class="nx-sub">Verified Official Store · Team Kits</div></div></div>
-    <div class="nx-search d-desk"><i class="fas fa-magnifying-glass"></i><input id="nx-q" placeholder="পছন্দের জার্সি সার্চ করুন..." oninput="jnShopFilter()"></div>
+    <div class="nx-search d-desk"><i class="fas fa-magnifying-glass"></i><input id="nx-q" list="nx-sug" autocomplete="off" placeholder="পছন্দের জার্সি সার্চ করুন..." oninput="jnShopFilter()"></div>
     <div class="nx-act"><a id="nx-fb" class="nx-ic fb" href="https://facebook.com" target="_blank" rel="noopener" title="Facebook Page"><i class="fab fa-facebook-f"></i></a><a id="nx-wa" class="nx-ic wa" href="#" target="_blank" rel="noopener" title="WhatsApp"><i class="fab fa-whatsapp"></i></a><a href="#admin" class="sh-lock" title="Admin"><i class="fas fa-lock"></i></a></div>
   </div>
   <div class="nx-hero" id="nx-hero">
@@ -4976,10 +4992,10 @@ body:has(#jn-shop:not([hidden])){display:block}
     <div class="nx-dots" id="nx-dots"></div>
   </div>
   <div class="nx-bar">
-    <div class="nx-search d-mob"><i class="fas fa-magnifying-glass"></i><input id="nx-q2" placeholder="পছন্দের জার্সি সার্চ করুন..." oninput="document.getElementById('nx-q').value=this.value;jnShopFilter()"></div>
-    <div class="nx-pills" id="nx-pills"><button class="on" data-c="">সব জার্সি</button><button data-c="ফুটবল|football">⚽ ফুটবল</button><button data-c="ক্রিকেট|cricket">🏏 ক্রিকেট</button><button data-c="টিম|team|club|ক্লাব">👥 টিম স্পেশাল</button></div>
+    <div class="nx-search d-mob"><i class="fas fa-magnifying-glass"></i><input id="nx-q2" list="nx-sug" autocomplete="off" placeholder="পছন্দের জার্সি সার্চ করুন..." oninput="document.getElementById('nx-q').value=this.value;jnShopFilter()"></div>
+    <button class="sh-btn o" style="margin-bottom:10px;width:100%;font-weight:800" onclick="jnTrackOpen()">📦 আমার পার্সেল কোথায়? — ফোন নম্বর দিয়ে ট্র্যাক করুন</button><div class="nx-pills" id="nx-pills"><button class="on" data-c="">সব জার্সি</button><button data-c="ফুটবল|football">⚽ ফুটবল</button><button data-c="ক্রিকেট|cricket">🏏 ক্রিকেট</button><button data-c="টিম|team|club|ক্লাব">👥 টিম স্পেশাল</button></div>
   </div>
-  <div class="sh-grid" id="sh-grid"><div class="sh-empty">লোড হচ্ছে...</div></div>
+  <datalist id="nx-sug"></datalist><div class="sh-grid" id="sh-grid"><div class="sh-empty">লোড হচ্ছে...</div></div>
 </div>
 
 <div class="sh-modal" id="sh-modal"><div class="sh-box" id="sh-box"></div></div>
@@ -5076,20 +5092,27 @@ body:has(#jn-shop:not([hidden])){display:block}
     var dots=document.querySelectorAll('#nx-dots b'); dots.forEach(function(b,j){b.onclick=function(){showHero(j);restartHero();};});
     showHero(Math.min(HI,HIDS.length-1)); restartHero();
   }
-  window.jnShopFilter=function(){ renderCards(); };
+  function autoCat(t){ t=String(t||'').toLowerCase();
+    if(/cricket|ক্রিকেট|bpl|ipl|টাইগার|tiger|psl/.test(t)) return 'ক্রিকেট';
+    if(/football|ফুটবল|argentina|আর্জেন্টিনা|brazil|ব্রাজিল|portugal|পর্তুগাল|germany|জার্মানি|france|ফ্রান্স|spain|real|madrid|barca|barcelona|বার্সা|রিয়াল|messi|মেসি|ronaldo|রোনালদো|neymar|nassr|miami|psg|city|united|liverpool|chelsea|arsenal|bayern|juventus|milan|inter/.test(t)) return 'ফুটবল';
+    if(/team|টিম|club|ক্লাব|custom|কাস্টম|tournament|টুর্নামেন্ট/.test(t)) return 'টিম';
+    return ''; }
+  function fillSug(){ var dl=document.getElementById('nx-sug'); if(!dl) return; dl.innerHTML=visIds().map(function(k){return '<option value="'+esc(P[k].name)+'">';}).join(''); }
+  window.jnShopFilter=function(){ var q=((document.getElementById('nx-q')||{}).value||'').trim().toLowerCase(); renderCards();
+    var hit=visIds().filter(function(k){return String(P[k].name||'').trim().toLowerCase()===q;}); if(q&&hit.length===1) jnShopOpen(hit[0]); };
   document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('#nx-pills button'); if(!b) return;
     document.querySelectorAll('#nx-pills button').forEach(function(x){x.classList.remove('on');}); b.classList.add('on'); CAT=b.dataset.c; renderCards();});
   function renderCards(){
     var g=document.getElementById('sh-grid'); var q=((document.getElementById('nx-q')||{}).value||'').trim().toLowerCase();
     var re=CAT?new RegExp(CAT,'i'):null;
-    var ids=visIds().filter(function(k){var p=P[k]; var txt=[p.name,p.desc,p.description,p.category,p.tags].join(' ');
+    var ids=visIds().filter(function(k){var p=P[k]; var txt=[p.name,p.desc,p.description,p.category||autoCat(p.name+' '+(p.desc||'')),p.tags].join(' ');
       return (!q||txt.toLowerCase().indexOf(q)>-1) && (!re||re.test(txt));});
     if(!visIds().length){ g.innerHTML='<div class="sh-empty">শীঘ্রই নতুন জার্সি আসছে...</div>'; return; }
     if(!ids.length){ g.innerHTML='<div class="sh-empty">কোনো জার্সি পাওয়া যায়নি।</div>'; return; }
     g.innerHTML = ids.map(function(k){var p=P[k];var im=(p.images||[])[0]||'';
       return '<div class="sh-card" style="position:relative" onclick="jnShopOpen(\''+k+'\')">'+(p.pinned?'<span style="position:absolute;top:8px;left:8px;z-index:2;background:#facc15;color:#111;font-size:11px;font-weight:800;padding:3px 8px;border-radius:20px">📌 জনপ্রিয়</span>':'')+'<img loading="lazy" src="'+esc(im)+'" alt="'+esc(p.name)+'"><div class="b"><h3>'+esc(p.name)+'</h3><div class="p">৳'+n(p.price)+' <span style="color:#7a99a8;font-size:11px;font-weight:600">/ পিস · মিনিমাম ৫ পিস</span></div></div></div>';}).join('');
   }
-  function renderGrid(){ setLinks(); renderCards(); updateHeroSlider(); }
+  function renderGrid(){ setLinks(); renderCards(); updateHeroSlider(); fillSug(); }
 
   window.jnShopOpen = function(id){
     cur = Object.assign({id:id}, P[id]); cur._fab=0; cur._neck='c'; mode='single'; roster=[{name:'',num:'',size:'L'}];
@@ -5308,6 +5331,7 @@ body:has(#jn-shop:not([hidden])){display:block}
         +'<div style="margin:10px 0;background:#050c14;border:1px solid #1a3e52;border-radius:8px;padding:8px 10px"><div style="font-size:12px;font-weight:700;color:#22d3ee;margin-bottom:4px">✅ এই জার্সিতে কোন কোন কাপড় পাওয়া যাবে?</div><div style="font-size:11px;color:#8ab;margin-bottom:6px">টিক তুলে দিলে কাস্টমার সেই কাপড় দেখবে না</div><div style="display:flex;flex-wrap:wrap;gap:6px">'
         +fabs().map(function(f,i){var off=isEdit&&ep&&ep.fabOff&&ep.fabOff.indexOf(f.n)>-1;return '<label style="display:flex;gap:5px;align-items:center;font-size:12px;background:#0b1520;border:1px solid #334155;border-radius:6px;padding:5px 8px;cursor:pointer"><input type="checkbox" class="apf-on" data-n="'+esc(f.n)+'"'+(off?'':' checked')+'> '+esc(f.n)+'</label>';}).join('')
         +'</div></div>'
+        +'<div style="margin:8px 0"><div style="font-size:12px;font-weight:700;color:#22d3ee;margin-bottom:4px">🏷️ ক্যাটাগরি <span style="color:#8ab;font-weight:400">(নাম দেখে নিজে থেকে বাছাই হয়, চাইলে বদলান)</span></div><div class="nx-pills" id="ap-cats">'+[['auto','🤖 অটো'],['ফুটবল','⚽ ফুটবল'],['ক্রিকেট','🏏 ক্রিকেট'],['টিম','👥 টিম স্পেশাল']].map(function(c){var on=(isEdit&&ep.category?ep.category:'auto')===c[0];return '<button type="button" data-v="'+c[0]+'" class="'+(on?'on':'')+'" onclick="jnCatPick(this)">'+c[1]+'</button>';}).join('')+'</div></div>'
         +'<textarea id="ap-desc" rows="2" placeholder="বিবরণ (ফেব্রিক, ডেলিভারি সময়...)" style="margin-bottom:8px">'+esc(isEdit?(ep.desc||''):'')+'</textarea>';
 
       if(isEdit){
@@ -5365,7 +5389,7 @@ window.jnShopSaveCfg=function(){var w=document.getElementById('as-wa').value.rep
     Swal.fire({title:'ছবি আপলোড হচ্ছে...',allowOutsideClick:false,didOpen:function(){Swal.showLoading();}});
     try{
       var imgs=[];for(var i=0;i<Math.min(files.length,8);i++) imgs.push(await compress(files[i]));
-      await rdb().ref('shop_public/products').push({name:name,price:price,printCharge:n(document.getElementById('ap-print').value),desc:document.getElementById('ap-desc').value.trim(),fabrics:FAB_DEF.map(function(f,i){return {n:f.n,c:n(document.getElementById('apf-c'+i).value),r:n(document.getElementById('apf-r'+i).value)};}),images:imgs,fabOff:fabOffVal(),single:!!document.getElementById('ap-single').checked,sFab:document.getElementById('ap-sfab').value.trim(),createdAt:Date.now()});
+      await rdb().ref('shop_public/products').push({name:name,price:price,printCharge:n(document.getElementById('ap-print').value),desc:document.getElementById('ap-desc').value.trim(),fabrics:FAB_DEF.map(function(f,i){return {n:f.n,c:n(document.getElementById('apf-c'+i).value),r:n(document.getElementById('apf-r'+i).value)};}),images:imgs,fabOff:fabOffVal(),single:!!document.getElementById('ap-single').checked,category:catVal(),sFab:document.getElementById('ap-sfab').value.trim(),createdAt:Date.now()});
       var s=await rdb().ref('shop_public/products').once('value');P=s.val()||{};
       editProdKey=null; editExistingImgs=[];
       Swal.fire('শপে যোগ হয়েছে!','','success');aTab='list';aDraw();
@@ -5393,6 +5417,7 @@ window.jnShopSaveCfg=function(){var w=document.getElementById('as-wa').value.rep
         images:imgs,
         fabOff:fabOffVal(),
         single:!!document.getElementById('ap-single').checked,
+        category:catVal(),
         sFab:document.getElementById('ap-sfab').value.trim(),
         updatedAt:Date.now()
       });
@@ -5402,6 +5427,8 @@ window.jnShopSaveCfg=function(){var w=document.getElementById('as-wa').value.rep
       aTab='list';aDraw();
     }catch(e){Swal.fire('আপডেট হয়নি','Firebase rules আপডেট করুন','error');}
   };
+  function catVal(){ var b=document.querySelector('#ap-cats button.on'); var v=b?b.getAttribute('data-v'):'auto'; return v==='auto'?'':v; }
+  window.jnCatPick=function(b){ document.querySelectorAll('#ap-cats button').forEach(function(x){x.classList.remove('on');}); b.classList.add('on'); };
   function fabOffVal(){ var o=[]; document.querySelectorAll('.apf-on').forEach(function(c){ if(!c.checked) o.push(c.getAttribute('data-n')); }); return o; }
   window.jnShopPin=function(k){rdb().ref('shop_public/products/'+k+'/pinned').set(!P[k].pinned).then(function(){P[k].pinned=!P[k].pinned;aDraw();if(typeof renderCards==='function')renderCards();});};
   window.jnShopHide=function(k){rdb().ref('shop_public/products/'+k+'/hidden').set(!P[k].hidden).then(function(){P[k].hidden=!P[k].hidden;aDraw();});};
@@ -5433,7 +5460,7 @@ window.jnShopSaveCfg=function(){var w=document.getElementById('as-wa').value.rep
     h+='<div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding:10px;border-radius:8px;background:#0b1220;border:1px solid #1e293b"><div>'+(p.sFab?'🧵 '+esc(p.sFab):'👕 সিঙ্গেল জার্সি')+'</div><div style="font-size:22px;font-weight:800;color:#22d3ee">৳'+n(p.price)+'</div></div>';
     if(p.desc) h+='<p style="color:#9bb;margin:8px 0;white-space:pre-line">'+esc(p.desc)+'</p>';
     h+='<div class="jn-sg"><div><div class="sh-step">সাইজ বেছে নিন</div><div class="jn-szb">'+SZ.map(function(s){return '<button class="'+(cur._sz===s[0]?'on':'')+'" onclick="jnSzSel(\''+s[0]+'\')">'+s[0]+'</button>';}).join('')+'</div>'
-      +'<input id="so-name" class="sh-in" placeholder="আপনার নাম" value="'+v('so-name')+'"><input id="so-phone" class="sh-in" type="tel" inputmode="numeric" placeholder="মোবাইল নম্বর (01XXXXXXXXX)" value="'+v('so-phone')+'"><textarea id="so-addr" class="sh-in" rows="2" placeholder="সম্পূর্ণ ঠিকানা (গ্রাম/এলাকা, থানা, জেলা)">'+v('so-addr')+'</textarea></div>'
+      +'<input id="so-name" class="sh-in" placeholder="আপনার নাম" value="'+v('so-name')+'"><div style="display:flex;gap:8px"><input id="so-pn" class="sh-in" maxlength="14" placeholder="জার্সিতে নাম (ঐচ্ছিক)" value="'+v('so-pn')+'"><input id="so-pnum" class="sh-in" style="max-width:110px" inputmode="numeric" maxlength="3" placeholder="নম্বর (ঐচ্ছিক)" value="'+v('so-pnum')+'"></div><input id="so-phone" class="sh-in" type="tel" inputmode="numeric" placeholder="মোবাইল নম্বর (01XXXXXXXXX)" value="'+v('so-phone')+'"><textarea id="so-addr" class="sh-in" rows="2" placeholder="সম্পূর্ণ ঠিকানা (গ্রাম/এলাকা, থানা, জেলা)">'+v('so-addr')+'</textarea></div>'
       +'<div><div class="sh-step">📏 সাইজ চার্ট (ইঞ্চি)</div><table class="jn-szt"><tr><th>সাইজ</th><th>লম্বা</th><th>বুক</th></tr>'+SZ.map(function(s){return '<tr class="'+(cur._sz===s[0]?'on':'')+'"><td>'+s[0]+'</td><td>'+s[1]+'"</td><td>'+s[2]+'"</td></tr>';}).join('')+'</table></div></div>';
     h+='<button class="sh-btn g" style="width:100%;margin-top:12px;padding:14px;font-size:16px" onclick="jnSingleOrder()"><i class="fab fa-whatsapp"></i> WhatsApp-এ অর্ডার করুন</button>';
     document.getElementById('sh-box').innerHTML=h;
@@ -5446,7 +5473,8 @@ window.jnShopSaveCfg=function(){var w=document.getElementById('as-wa').value.rep
     if(!/^01[0-9]{9}$/.test(ph)) return Swal.fire('সঠিক মোবাইল নম্বর দিন','যেমন: 01XXXXXXXXX','warning');
     if(ad.length<8) return Swal.fire('সম্পূর্ণ ঠিকানা লিখুন','','warning');
     var num=(CFG.whatsapp||'').replace(/\D/g,''); if(!num) return Swal.fire('WhatsApp নম্বর নেই','','info');
-    var t='🛒 সিঙ্গেল জার্সি অর্ডার\n• জার্সি: '+cur.name+(cur.sFab?'\n• কাপড়: '+cur.sFab:'')+'\n• সাইজ: '+cur._sz+'\n• দাম: ৳'+n(cur.price)+'\n\n👤 নাম: '+nm+'\n📞 ফোন: '+ph+'\n📍 ঠিকানা: '+ad+'\n\nছবি: '+location.origin+location.pathname+'#p='+cur.id;
+    var pn=(document.getElementById('so-pn')||{}).value||'', pnum=(document.getElementById('so-pnum')||{}).value||''; pn=pn.trim().toUpperCase(); pnum=pnum.trim();
+    var t='🛒 সিঙ্গেল জার্সি অর্ডার\n• জার্সি: '+cur.name+(cur.sFab?'\n• কাপড়: '+cur.sFab:'')+'\n• সাইজ: '+cur._sz+(pn?'\n• পেছনে নাম: '+pn:'')+(pnum?'\n• পেছনে নম্বর: '+pnum:'')+'\n• দাম: ৳'+n(cur.price)+'\n\n👤 নাম: '+nm+'\n📞 ফোন: '+ph+'\n📍 ঠিকানা: '+ad+'\n\nছবি: '+location.origin+location.pathname+'#p='+cur.id;
     window.open('https://wa.me/'+(num.length===11?'88'+num:num)+'?text='+encodeURIComponent(t),'_blank');
   };
   function draw2(){
@@ -5476,6 +5504,15 @@ window.jnShopSaveCfg=function(){var w=document.getElementById('as-wa').value.rep
   var _ph=setInterval(function(){ var m=location.hash.match(/^#p=(.+)$/); if(!m){clearInterval(_ph);return;} if(P[m[1]]){ clearInterval(_ph); jnShopOpen(m[1]); } },500);
   setTimeout(function(){clearInterval(_ph);},15000);
 
+  window.jnTrackOpen=function(){
+    Swal.fire({title:'📦 পার্সেল ট্র্যাক করুন',input:'tel',inputPlaceholder:'অর্ডারের মোবাইল নম্বর (01XXXXXXXXX)',confirmButtonText:'খুঁজুন',showCancelButton:true,cancelButtonText:'বন্ধ',background:'#0b1522',color:'#e6f6ff',
+      preConfirm:async function(v){ var ph=String(v||'').replace(/\D/g,'').slice(-11); if(!/^01\d{9}$/.test(ph)){Swal.showValidationMessage('সঠিক ১১ ডিজিটের নম্বর দিন');return false;}
+        var b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode('jn:'+ph)); var h=Array.from(new Uint8Array(b)).map(function(x){return x.toString(16).padStart(2,'0');}).join('').slice(0,32);
+        try{ var s=await rdb().ref('shop_public/track/'+h).once('value'); return s.val()||[]; }catch(e){ Swal.showValidationMessage('এখন খোঁজা যাচ্ছে না, পরে চেষ্টা করুন'); return false; } }
+    }).then(function(r){ if(!r.isConfirmed) return; var L=r.value||[];
+      var html=L.length?L.map(function(o){return '<div style="text-align:left;background:#0f2030;border-radius:10px;padding:10px;margin:6px 0"><b>'+esc(o.p)+'</b><div style="color:#22d3ee;font-weight:800;margin-top:4px">'+esc(o.s)+'</div><small style="color:#8ab">'+(o.d?new Date(o.d).toLocaleDateString('bn-BD'):'')+'</small>'+(o.t?' · <a href="'+esc(o.t)+'" target="_blank" style="color:#facc15">কুরিয়ারে দেখুন</a>':'')+'</div>';}).join(''):'<div style="color:#9bb">এই নম্বরে কোনো অর্ডার পাওয়া যায়নি। WhatsApp-এ যোগাযোগ করুন।</div>';
+      Swal.fire({title:'আপনার অর্ডার',html:html,confirmButtonText:'ঠিক আছে',background:'#0b1522',color:'#e6f6ff'}); });
+  };
   route();
 })();
 </script>

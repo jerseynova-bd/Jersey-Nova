@@ -5461,7 +5461,7 @@ window.jnShopSaveCfg=function(){var w=document.getElementById('as-wa').value.rep
     if(/dhaka|ঢাকা|mirpur|মিরপুর|uttara|উত্তরা|dhanmondi|ধানমন্ডি|mohammadpur|মোহাম্মদপুর|gulshan|গুলশান|banani|বনানী|badda|বাড্ডা|rampura|রামপুরা|motijheel|মতিঝিল|jatrabari|যাত্রাবাড়ী|khilgaon|খিলগাঁও|bashundhara|বসুন্ধরা|tejgaon|তেজগাঁও|demra|ডেমরা/.test(t)) return 'd';
     return t.trim().length>=8?'o':''; }
   window.jnArea=function(a,re){ cur._area=a; cur._areaManual=true; if(re) re(); };
-  window.jnAddrArea=function(v){ if(cur._areaManual) return; var a=guessArea(v); if(a&&a!==cur._area){ cur._area=a; var e=document.getElementById('jn-del-box'); if(e) e.innerHTML=delBox(cur.single?n(cur.price):fPrice((fabs()[cur._fab]||fabs()[0]),cur._neck)*(cur._qty||5)); } };
+  window.jnAddrArea=function(v){ return; var a=guessArea(v); if(a&&a!==cur._area){ cur._area=a; var e=document.getElementById('jn-del-box'); if(e) e.innerHTML=delBox(cur.single?n(cur.price):fPrice((fabs()[cur._fab]||fabs()[0]),cur._neck)*(cur._qty||5)); } };
   function delBox(sub){
     var q=cur.single?1:(cur._qty||5), fn=cur.single?'drawSingle':'draw2';
     var h='<div style="display:flex;gap:6px;flex-wrap:wrap">'+Object.keys(DEL_AREA).map(function(k){var on=cur._area===k;return '<button type="button" onclick="cur_area_set(\''+k+'\')" style="flex:1;min-width:90px;padding:8px;border-radius:8px;cursor:pointer;font-weight:700;font-size:12px;background:#0b1220;color:#e6f6ff;border:2px solid '+(on?'#22d3ee':'#334155')+'">'+(k==='d'?'🏙️ ঢাকা সিটি':k==='s'?'🏘️ সাব-আর্ব':'🚚 ঢাকার বাইরে')+'<br><span style="color:#22d3ee">৳'+delFee(k,q)+'</span></button>';}).join('')+'</div>';
@@ -5479,7 +5479,6 @@ window.jnShopSaveCfg=function(){var w=document.getElementById('as-wa').value.rep
     h+='<div class="jn-sg"><div><div class="sh-step">সাইজ বেছে নিন</div><div class="jn-szb">'+SZ.map(function(s){return '<button class="'+(cur._sz===s[0]?'on':'')+'" onclick="jnSzSel(\''+s[0]+'\')">'+s[0]+'</button>';}).join('')+'</div>'
       +'<input id="so-name" class="sh-in" placeholder="আপনার নাম" value="'+v('so-name')+'"><div style="display:flex;gap:8px"><input id="so-pn" class="sh-in" maxlength="14" placeholder="জার্সিতে নাম (ঐচ্ছিক)" value="'+v('so-pn')+'"><input id="so-pnum" class="sh-in" style="max-width:110px" inputmode="numeric" maxlength="3" placeholder="নম্বর (ঐচ্ছিক)" value="'+v('so-pnum')+'"></div><input id="so-phone" class="sh-in" type="tel" inputmode="numeric" placeholder="মোবাইল নম্বর (01XXXXXXXXX)" value="'+v('so-phone')+'"><textarea id="so-addr" class="sh-in" rows="2" oninput="jnAddrArea(this.value)" placeholder="সম্পূর্ণ ঠিকানা (গ্রাম/এলাকা, থানা, জেলা)">'+v('so-addr')+'</textarea></div>'
       +'<div><div class="sh-step">📏 সাইজ চার্ট (ইঞ্চি)</div><table class="jn-szt"><tr><th>সাইজ</th><th>লম্বা</th><th>বুক</th></tr>'+SZ.map(function(s){return '<tr class="'+(cur._sz===s[0]?'on':'')+'"><td>'+s[0]+'</td><td>'+s[1]+'"</td><td>'+s[2]+'"</td></tr>';}).join('')+'</table></div></div>';
-    h+='<div class="sh-step">🚚 ডেলিভারি চার্জ (অটো)</div><div id="jn-del-box">'+delBox(n(p.price))+'</div>';
     h+='<button class="sh-btn g" style="width:100%;margin-top:12px;padding:14px;font-size:16px" onclick="jnSingleOrder()"><i class="fab fa-whatsapp"></i> WhatsApp-এ অর্ডার করুন</button>';
     document.getElementById('sh-box').innerHTML=h;
   }
@@ -5490,10 +5489,9 @@ window.jnShopSaveCfg=function(){var w=document.getElementById('as-wa').value.rep
     if(!nm) return Swal.fire('নাম লিখুন','','warning');
     if(!/^01[0-9]{9}$/.test(ph)) return Swal.fire('সঠিক মোবাইল নম্বর দিন','যেমন: 01XXXXXXXXX','warning');
     if(ad.length<8) return Swal.fire('সম্পূর্ণ ঠিকানা লিখুন','','warning');
-    if(!cur._area) cur._area=guessArea(ad)||'o';
     var num=(CFG.whatsapp||'').replace(/\D/g,''); if(!num) return Swal.fire('WhatsApp নম্বর নেই','','info');
     var pn=(document.getElementById('so-pn')||{}).value||'', pnum=(document.getElementById('so-pnum')||{}).value||''; pn=pn.trim().toUpperCase(); pnum=pnum.trim();
-    var t='🛒 সিঙ্গেল জার্সি অর্ডার\n• জার্সি: '+cur.name+(cur.sFab?'\n• কাপড়: '+cur.sFab:'')+'\n• সাইজ: '+cur._sz+(pn?'\n• পেছনে নাম: '+pn:'')+(pnum?'\n• পেছনে নম্বর: '+pnum:'')+'\n• দাম: ৳'+n(cur.price)+'\n• ডেলিভারি ('+DEL_AREA[cur._area].t+'): ৳'+delFee(cur._area,1)+'\n• সর্বমোট: ৳'+(n(cur.price)+delFee(cur._area,1))+'\n\n👤 নাম: '+nm+'\n📞 ফোন: '+ph+'\n📍 ঠিকানা: '+ad+'\n\nছবি: '+location.origin+location.pathname+'#p='+cur.id;
+    var t='🛒 সিঙ্গেল জার্সি অর্ডার\n• জার্সি: '+cur.name+(cur.sFab?'\n• কাপড়: '+cur.sFab:'')+'\n• সাইজ: '+cur._sz+(pn?'\n• পেছনে নাম: '+pn:'')+(pnum?'\n• পেছনে নম্বর: '+pnum:'')+'\n• দাম: ৳'+n(cur.price)+'\n\n👤 নাম: '+nm+'\n📞 ফোন: '+ph+'\n📍 ঠিকানা: '+ad+'\n\nছবি: '+location.origin+location.pathname+'#p='+cur.id;
     window.open('https://wa.me/'+(num.length===11?'88'+num:num)+'?text='+encodeURIComponent(t),'_blank');
   };
   function draw2(){
@@ -5506,7 +5504,7 @@ window.jnShopSaveCfg=function(){var w=document.getElementById('as-wa').value.rep
     h+='<div style="margin-top:10px;padding:10px;border:1px solid #22d3ee;border-radius:8px;background:#0b1220">'+(f.img?'<img src="'+esc(f.img)+'" style="width:100%;max-height:260px;object-fit:cover;border-radius:6px">':'<div style="color:#9bb;font-size:12px">এই কাপড়ের ছবি শীঘ্রই যোগ হবে</div>')+'<div style="font-size:16px;font-weight:800;margin-top:6px">🧵 '+esc(f.n)+'</div></div>';
     if(!f.one) h+='<div class="sh-step">ধাপ ২: গলার ধরন</div><div class="sh-tabs"><button class="'+(cur._neck!=='r'?'on':'')+'" onclick="jnNeckSel(\'c\')">কলার ৳'+n(f.c)+'</button><button class="'+(cur._neck==='r'?'on':'')+'" onclick="jnNeckSel(\'r\')">গোল গলা ৳'+n(f.r)+'</button></div>';
     h+='<div style="font-size:22px;font-weight:800;color:#22d3ee;margin-top:12px">৳'+fPrice(f,cur._neck)+' / পিস</div>';
-    h+='<div class="sh-step">🚚 পরিমাণ ও ডেলিভারি চার্জ</div><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span>কত পিস?</span><input type="number" min="1" max="200" value="'+(cur._qty||5)+'" oninput="jnQty(this.value)" class="sh-in" style="max-width:100px"></div><div id="jn-del-box">'+delBox(fPrice(f,cur._neck)*(cur._qty||5))+'</div>';
+    h+='<div class="sh-step">🔢 পরিমাণ</div><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><span>কত পিস?</span><input type="number" min="1" max="200" value="'+(cur._qty||5)+'" oninput="jnQty(this.value)" class="sh-in" style="max-width:100px"></div>';
     h+='<button class="sh-btn g" style="width:100%;margin-top:10px;padding:14px;font-size:16px" onclick="jnSendWa()"><i class="fab fa-whatsapp"></i> WhatsApp-এ পাঠান</button><div style="color:#9bb;font-size:12px;text-align:center;margin-top:6px">সাইজ, নাম-নম্বর ও পেমেন্ট WhatsApp-এ কথা বলে ঠিক করা হবে</div>';
     document.getElementById('sh-box').innerHTML=h;
   }
@@ -5517,7 +5515,7 @@ window.jnShopSaveCfg=function(){var w=document.getElementById('as-wa').value.rep
   window.jnSendWa=function(){
     var num=(CFG.whatsapp||'').replace(/\D/g,''); if(!num){ Swal.fire('WhatsApp নম্বর নেই','এডমিন প্যানেলে WhatsApp নম্বর সেভ করুন।','info'); return; }
     var F=fabs(), f=F[cur._fab]||F[0], link=location.origin+location.pathname+'#p='+cur.id;
-    var q=cur._qty||5, pr=fPrice(f,cur._neck), d=cur._area?delFee(cur._area,q):0;
+    var q=cur._qty||5, pr=fPrice(f,cur._neck), d=0; cur._area='';
     var t='হ্যালো! আমি এই জার্সিটি নিতে চাই:\n• জার্সি: '+cur.name+'\n• কাপড়: '+f.n+(f.one?'':'\n• গলা: '+(cur._neck==='r'?'গোল গলা':'কলার'))+'\n• দাম: ৳'+pr+' / পিস\n• পরিমাণ: '+q+' পিস = ৳'+(pr*q)+(cur._area?'\n• ডেলিভারি ('+DEL_AREA[cur._area].t+'): ৳'+d+'\n• সর্বমোট: ৳'+(pr*q+d):'')+'\n• জার্সি ও কাপড়ের ছবি: '+link;
     window.open('https://wa.me/'+(num.length===11?'88'+num:num)+'?text='+encodeURIComponent(t),'_blank');
   };

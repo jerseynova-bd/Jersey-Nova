@@ -1570,6 +1570,7 @@ body:has(#jn-shop:not([hidden])){display:block}
 
             if(appSettings.logo) {
                 document.querySelectorAll('.app-logo').forEach(img => { img.src = appSettings.logo; img.classList.remove('hidden'); });
+                _cleanLogoSrc(appSettings.logo).then(clean => { if(clean !== appSettings.logo){ appSettings.logo = clean; document.querySelectorAll('.app-logo').forEach(img => img.src = clean); const sl=document.getElementById('splash-logo'); if(sl) sl.src = clean; } });
                 document.querySelectorAll('.app-logo-text').forEach(el => el.classList.add('hidden'));
             }
             // Splash + Home-screen app icon = user's logo
@@ -1641,8 +1642,7 @@ body:has(#jn-shop:not([hidden])){display:block}
                 const icon512 = await _buildIconCanvas(512, logoSrc, bName, color);
                 // apple-touch-icon links
                 document.querySelectorAll('link[rel="apple-touch-icon"]').forEach(l => l.href = icon192);
-                // favicon
-                document.querySelectorAll('link[rel="icon"]').forEach(l => l.href = icon192);
+                // favicon stays the static favicon.png so Google always finds the real logo
                 // theme color
                 const tc = document.querySelector('meta[name="theme-color"]'); if(tc) tc.setAttribute('content', color || '#4f46e5');
                 // manifest blob
@@ -1706,6 +1706,35 @@ body:has(#jn-shop:not([hidden])){display:block}
             }
         }
 
+        // If a logo arrives with a solid black background (phone gallery / WhatsApp
+        // converted the transparent PNG to JPEG), make that outer black transparent.
+        function _stripDarkBg(cv){
+            try{
+                const w=cv.width,h=cv.height,ctx=cv.getContext('2d');
+                const d=ctx.getImageData(0,0,w,h),px=d.data;
+                for(let i=3;i<px.length;i+=4){ if(px[i]<250) return false; } // already has transparency
+                const dark=(i)=>Math.max(px[i],px[i+1],px[i+2])<48;
+                const corners=[0,(w-1)*4,((h-1)*w)*4,((h-1)*w+w-1)*4].filter(dark).length;
+                if(corners<3) return false;
+                const seen=new Uint8Array(w*h),st=[];
+                for(let x=0;x<w;x++){st.push(x,(h-1)*w+x);} for(let y=0;y<h;y++){st.push(y*w,y*w+w-1);}
+                while(st.length){ const k=st.pop(); if(seen[k]) continue; const i=k*4; if(!dark(i)) continue; seen[k]=1; px[i+3]=0;
+                    const x=k%w,y=(k/w)|0; if(x>0)st.push(k-1); if(x<w-1)st.push(k+1); if(y>0)st.push(k-w); if(y<h-1)st.push(k+w); }
+                // soften the dark fringe next to removed pixels
+                for(let k=0;k<w*h;k++){ if(seen[k]) continue; const x=k%w,y=(k/w)|0;
+                    if((x>0&&seen[k-1])||(x<w-1&&seen[k+1])||(y>0&&seen[k-w])||(y<h-1&&seen[k+w])){
+                        const i=k*4,m=Math.max(px[i],px[i+1],px[i+2]); if(m<110) px[i+3]=Math.round(255*Math.max(0,(m-48))/62); } }
+                ctx.putImageData(d,0,0); return true;
+            }catch(e){ return false; }
+        }
+        function _cleanLogoSrc(src){
+            return new Promise(res=>{
+                if(!src || !/^data:image\/(jpe?g|webp|png)/i.test(src)) return res(src);
+                const im=new Image(); im.onload=()=>{ const c=document.createElement('canvas'); c.width=im.naturalWidth; c.height=im.naturalHeight;
+                    c.getContext('2d').drawImage(im,0,0); res(_stripDarkBg(c)?c.toDataURL('image/png'):src); };
+                im.onerror=()=>res(src); im.src=src; });
+        }
+
         function processFile(file, dbKey) {
             if(!file.type.startsWith('image/')) return Swal.fire({icon: 'error', title: 'শুধুমাত্র ছবি আপলোড করুন!'});
             Swal.fire({ title: 'ছবি অপ্টিমাইজ ও আপলোড হচ্ছে...', allowOutsideClick: false, didOpen: () => { Swal.showLoading() } });
@@ -1722,7 +1751,9 @@ body:has(#jn-shop:not([hidden])){display:block}
                     const cv = document.createElement('canvas');
                     cv.width = w; cv.height = h;
                     cv.getContext('2d').drawImage(img, 0, 0, w, h);
-                    const out = cv.toDataURL(file.type==='image/png'?'image/png':'image/jpeg', 0.85);
+                    // Logo/QR always stay PNG so transparent backgrounds never turn black
+                    if(dbKey === 'logo') _stripDarkBg(cv);
+                    const out = cv.toDataURL('image/png');
                     dbSettings.child(dbKey).set(out).then(() => {
                         Swal.close(); Toast.fire({ icon: 'success', title: 'ছবি সেভ হয়েছে!' });
                     }).catch(err => Swal.fire({icon: 'error', title: 'আপলোড সমস্যা', text: err.message || 'ছোট সাইজের ছবি দিন।'}));
